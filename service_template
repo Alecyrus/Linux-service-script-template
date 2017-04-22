@@ -1,0 +1,80 @@
+#!/bin/sh
+
+#
+### BEGIN INIT INFO
+# Provides:          ServiceName
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start and stop the SpringX  server daemon
+### END INIT INFO
+#
+
+
+#set -e
+
+SERVICENAME="ServiceName"
+
+FILENAME=pid/process.pid
+
+. /lib/lsb/init-functions
+
+
+service_stop() {
+    log_daemon_msg "Stopping the $SERVICENAME-services"
+    if [ ! -s $FILENAME ]; then
+        log_failure_msg "$SERVICENAME-service is not active."
+        log_end_msg 1
+        return 0
+    fi
+
+    while read line
+    do
+         kill -9  $line
+         sed -i '/'$line'/d' pid/process.pid
+    done< $FILENAME
+    sleep 2
+    log_end_msg 0
+}
+
+service_start() {
+    log_daemon_msg "Starting the $SERVICENAME-services"
+    if [ -s $FILENAME ]; then 
+        log_failure_msg "$SERVICENAME-service is running."
+        log_end_msg 1
+        return 0
+    fi
+    python3 environment_api.py&
+    python3 template_api.py&
+    python3 user_api.py&
+    sleep 2
+    log_end_msg 0
+    cd api
+    python3 server.py&
+}
+
+service_status() {
+    if [ -s $FILENAME ]; then 
+        log_warning_msg "$SERVICENAME-service is running."
+    else
+        log_warning_msg "$SERVICENAME-service is not active." 
+   fi 
+}
+
+case $1 in
+    restart)
+        service_stop;service_start;;
+    start)
+        service_start;;
+    status)
+        service_status;;
+    stop)
+        service_stop;;
+    *) 
+       log_failure_msg "$1: Error: The action is not supported.";;
+esac
+
+exit 0
